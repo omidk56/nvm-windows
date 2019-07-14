@@ -3,60 +3,52 @@ SET INNOSETUP=%CD%\nvm.iss
 SET ORIG=%CD%
 REM SET GOPATH=%CD%\src
 SET GOBIN=%CD%\bin
+REM Support for older architectures
 SET GOARCH=386
-SET version=1.1.6
 
-REM Get the version number from the setup file
-REM for /f "tokens=*" %%i in ('findstr /n . %INNOSETUP% ^| findstr ^4:#define') do set L=%%i
-REM set version=%L:~24,-1%
-
-REM Get the version number from the core executable
-REM for /f "tokens=*" %%i in ('findstr /n . %GOPATH%\nvm.go ^| findstr ^NvmVersion^| findstr ^21^') do set L=%%i
-REM set goversion=%L:~19,-1%
-
-REM IF NOT %version%==%goversion% GOTO VERSIONMISMATCH
-
-SET DIST=%CD%\dist\%version%
-
-REM Build the executable
-echo Building NVM for Windows
-REM rm %GOBIN%\nvm.exe
-REM cd %GOPATH%
-echo "=========================================>"
-REM echo %GOBIN%
-REM goxc -arch="386" -os="windows" -n="nvm" -d="%GOBIN%" -o="%GOBIN%\nvm{{.Ext}}" -tasks-=package
-
-REM cd %ORIG%
-REM rm %GOBIN%\src.exe
-REM rm %GOPATH%\src.exe
-REM rm %GOPATH%\nvm.exe
-
-REM Clean the dist directory
-rm -rf "%DIST%"
-mkdir "%DIST%"
-
-echo Creating distribution in %DIST%
-
+REM Cleanup existing build if it exists
 if exist src\nvm.exe (
-  rm src\nvm.exe
+  del src\nvm.exe
 )
 
-echo "Building nvm.exe...."
-
+REM Make the executable and add to the binary directory
+echo Building nvm.exe
 go build src\nvm.go
-mv nvm.exe %GOBIN%
 
-echo Building "noinstall" zip...
-for /d %%a in (%GOBIN%) do (buildtools\zip -j -9 -r "%DIST%\nvm-noinstall.zip" "%CD%\LICENSE" "%%a\*" -x "%GOBIN%\nodejs.ico")
+REM Group the file with the helper binaries
+move nvm.exe %GOBIN%
 
-echo "Building the primary installer..."
+REM Codesign the executable
+.\buildtools\signtools\x64\signtool.exe sign /debug /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a %GOBIN%\nvm.exe
+
+
+for /f %%i in ('%GOBIN%\nvm.exe version') do set AppVersion=%%i
+echo nvm.exe v%AppVersion% built.
+
+REM Create the distribution folder
+SET DIST=%CD%\dist\%AppVersion%
+
+REM Remove old build files if they exist.
+if exist %DIST% (
+  echo Clearing old build in %DIST%
+  rd /s /q "%DIST%"
+)
+
+REM Create the distribution directory
+mkdir "%DIST%"
+
+REM Create the "no install" zip version
+for %%a in (%GOBIN%) do (buildtools\zip -j -9 -r "%DIST%\nvm-noinstall.zip" "%CD%\LICENSE" "%%a\*" -x "%GOBIN%\nodejs.ico")
+
+REM Generate the installer (InnoSetup)
 buildtools\iscc %INNOSETUP% /o%DIST%
 buildtools\zip -j -9 -r "%DIST%\nvm-setup.zip" "%DIST%\nvm-setup.exe"
-echo "Generating Checksums for release files..."
 
-for /r %i in (*.zip *.exe) do checksum -file %i -t sha256 >> %i.sha256.txt
-echo "Distribution created. Now cleaning up...."
-rm %GOBIN%/nvm.exe
+REM Generate checksums
+for %%f in (%DIST%\*.*) do (certutil -hashfile "%%f" MD5 | find /i /v "md5" | find /i /v "certutil" >> "%%f.checksum.txt")
 
-echo "Done."
+REM Cleanup
+del %GOBIN%\nvm.exe
+
+echo NVM for Windows v%AppVersion% build completed.
 @echo on

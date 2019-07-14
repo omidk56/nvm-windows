@@ -22,6 +22,9 @@ func SearchBytesInFile( path string, match string, limit int) bool {
     return false;
   }
 
+  // Close file upon return
+  defer file.Close()
+
   // Allocate 1 byte array to perform the match
   bit := make([]byte, 1);
   j := 0
@@ -34,10 +37,12 @@ func SearchBytesInFile( path string, match string, limit int) bool {
     if bit[0] == toMatch[j] {
       j++;
       if (j >= len(toMatch)) {
+        file.Close();
         return true;
       }
     }
   }
+  file.Close();
   return false;
 }
 

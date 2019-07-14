@@ -1,9 +1,9 @@
 #define MyAppName "NVM for Windows"
 #define MyAppShortName "nvm"
 #define MyAppLCShortName "nvm"
-#define MyAppVersion "1.1.6"
+#define MyAppVersion ""
 #define MyAppPublisher "Ecor Ventures LLC"
-#define MyAppURL "http://github.com/coreybutler/nvm"
+#define MyAppURL "https://github.com/coreybutler/nvm-windows"
 #define MyAppExeName "nvm.exe"
 #define MyIcon "bin\nodejs.ico"
 #define ProjectRoot "."
@@ -13,10 +13,12 @@
 ; Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 PrivilegesRequired=admin
+SignTool=MsSign $f
+SignedUninstaller=yes
 AppId=40078385-F676-4C61-9A9C-F9028599D6D3
 AppName={#MyAppName}
-AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
+AppVersion={%AppVersion}
+AppVerName={#MyAppName} {%AppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
@@ -26,7 +28,7 @@ DisableDirPage=no
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile={#ProjectRoot}\LICENSE
-OutputDir={#ProjectRoot}\dist\{#MyAppVersion}
+OutputDir={#ProjectRoot}\dist\{%AppVersion}
 OutputBaseFilename={#MyAppLCShortName}-setup
 SetupIconFile={#ProjectRoot}\{#MyIcon}
 Compression=lzma
@@ -35,7 +37,7 @@ ChangesEnvironment=yes
 DisableProgramGroupPage=yes
 ArchitecturesInstallIn64BitMode=x64 ia64
 UninstallDisplayIcon={app}\{#MyIcon}
-AppCopyright=Copyright (C) 2016 Corey Butler and contributors.
+AppCopyright=Copyright (C) 2018 Ecor Ventures LLC and contributors.
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -77,7 +79,7 @@ end;
 var
   nodeInUse: string;
 
-function TakeControl(np: string; nv: string): string;
+procedure TakeControl(np: string; nv: string);
 var
   path: string;
 begin
@@ -147,9 +149,9 @@ begin
     Exec(ExpandConstant('{cmd}'), '/C node -v > "' + TmpResultFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     LoadStringFromFile(TmpResultFile, stdout);
     NodeVersion := Trim(Ansi2String(stdout));
-    msg1 := MsgBox('Node '+NodeVersion+' is already installed. Do you want NVM to control this version?', mbConfirmation, MB_YESNO) = IDNO;
+    msg1 := SuppressibleMsgBox('Node '+NodeVersion+' is already installed. Do you want NVM to control this version?', mbConfirmation, MB_YESNO, IDYES) = IDNO;
     if msg1 then begin
-      msg2 := MsgBox('NVM cannot run in parallel with an existing Node.js installation. Node.js must be uninstalled before NVM can be installed, or you must allow NVM to control the existing installation. Do you want NVM to control node '+NodeVersion+'?', mbConfirmation, MB_YESNO) = IDYES;
+      msg2 := SuppressibleMsgBox('NVM cannot run in parallel with an existing Node.js installation. Node.js must be uninstalled before NVM can be installed, or you must allow NVM to control the existing installation. Do you want NVM to control node '+NodeVersion+'?', mbConfirmation, MB_YESNO, IDYES) = IDYES;
       if msg2 then begin
         TakeControl(NodePath, NodeVersion);
       end;
@@ -172,7 +174,7 @@ begin
       RemoveDir(SymlinkPage.Values[0]);
     end;
     if not dir1 then begin
-      msg3 := MsgBox(SymlinkPage.Values[0]+' will be overwritten and all contents will be lost. Do you want to proceed?', mbConfirmation, MB_OKCANCEL) = IDOK;
+      msg3 := SuppressibleMsgBox(SymlinkPage.Values[0]+' will be overwritten and all contents will be lost. Do you want to proceed?', mbConfirmation, MB_OKCANCEL, IDOK) = IDOK;
       if msg3 then begin
         RemoveDir(SymlinkPage.Values[0]);
       end;
@@ -199,7 +201,7 @@ var
   path: string;
   nvm_symlink: string;
 begin
-  MsgBox('Removing NVM for Windows will remove the nvm command and all versions of node.js, including global npm modules.', mbInformation, MB_OK);
+  SuppressibleMsgBox('Removing NVM for Windows will remove the nvm command and all versions of node.js, including global npm modules.', mbInformation, MB_OK, IDOK);
 
   // Remove the symlink
   RegQueryStringValue(HKEY_LOCAL_MACHINE,
